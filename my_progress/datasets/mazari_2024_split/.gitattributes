@@ -1,0 +1,2 @@
+# Preserve CSV bytes: comments can contain embedded CR/LF line breaks.
+*.csv -text

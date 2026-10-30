@@ -10,9 +10,13 @@
 | `train.csv` | 原始 Jigsaw 訓練集的 90% |
 | `validation.csv` | 原始 Jigsaw 訓練集的 10% |
 | `test.csv` | 依 ID 合併測試文字與標籤，排除標籤為 -1 的資料 |
-| `split_info.json` | 原始檔雜湊、切分設定、各資料集的筆數與標籤正例數 |
+| `split_info.json` | 執行程式後產生的切分紀錄；本 repository 未包含此檔 |
 
 三個輸出 CSV 均包含 `id`、`comment_text`，以及六個 Jigsaw 二元標籤。程式不清洗或修改留言內容。
+
+## 資料來源與授權
+
+原始資料來自 [Jigsaw Toxic Comment Classification Challenge](https://www.kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge/data)。這裡的三個 CSV 是從原始資料切分、篩選而成。Kaggle 說明資料集以 CC0 發布，底層 Wikipedia 留言文字另受 [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) 授權約束；使用時請參考原始資料來源與其規則。
 
 ## 重現方式
 
