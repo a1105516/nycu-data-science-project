@@ -25,23 +25,29 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 |---|---|---|
 | Data Understanding | ✅ | EDA，在 repo 外完成 |
 | Data Preparation | ✅ | `src/prepare_data.py` |
-| Data Modeling | ⬜ | `src/baseline.py`、`src/train.py` |
-| Evaluation | ⬜ | `src/evaluate.py` |
+| Data Modeling | 🔄 baseline 完成；Transformer 程式已通過 smoke test，9 個 runs 待跑 | `src/baseline.py`、`src/train.py` |
+| Evaluation | 🔄 程式完成，等待實驗結果 | `src/evaluate.py` |
 | Refinement | ⬜ | 主實驗完成後再決定 |
 | Deployment（選做） | ⬜ | `src/demo.py` |
 
 ## 環境
 
 - Python 3.12
-- GPU：RTX 5070 12GB。訓練階段需要 PyTorch cu128，會在加入訓練程式時一併寫進 `requirements.txt`。
+- 訓練需要 NVIDIA GPU。PyTorch 要先單獨安裝 CUDA 版本，再裝其他套件。
 
 ```bash
 python -m venv .venv
 ```
 
 ```bash
+.venv/Scripts/python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+```
+
+```bash
 .venv/Scripts/python -m pip install -r requirements.txt
 ```
+
+在另一台電腦跑實驗的完整步驟見 [docs/run_guide.md](docs/run_guide.md)。
 
 ## 資料
 
@@ -88,9 +94,31 @@ datasets/
 ├── datasets/          # 原始資料（gitignored）
 ├── data/processed/    # prepare_data.py 產出（gitignored）
 ├── outputs/           # 訓練與評估產出（gitignored）
-├── docs/plan.md       # 執行計畫
+├── docs/
+│   ├── plan.md        # 執行計畫
+│   └── run_guide.md   # 實驗執行指南
 ├── src/
-│   ├── common.py      # 路徑、label 定義、clean()
-│   └── prepare_data.py
+│   ├── common.py      # 路徑、label 定義、clean()、metrics、共用工具
+│   ├── prepare_data.py
+│   ├── baseline.py    # TF-IDF + LR（CPU）
+│   ├── train.py       # BERT／RoBERTa／DeBERTa-v3（GPU）
+│   └── evaluate.py    # 讀 predictions，產出 results.md
 └── requirements.txt
 ```
+
+## 模型與評估
+
+```bash
+.venv/Scripts/python src/baseline.py
+```
+
+```bash
+.venv/Scripts/python src/train.py --model deberta --setting e0
+```
+
+```bash
+.venv/Scripts/python src/evaluate.py
+```
+
+- `train.py` 的完整參數與執行順序見 [docs/run_guide.md](docs/run_guide.md)。
+- `evaluate.py` 讀 `outputs/*/preds_*.parquet`，產出 `outputs/results.md`。
