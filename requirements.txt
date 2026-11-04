@@ -1,0 +1,8 @@
+# Data preparation (Phase 2). Split and sampling results depend on these versions.
+iterative-stratification==0.1.9
+numpy==2.5.4
+pandas==3.0.6
+pyarrow==26.0.0
+scikit-learn==1.9.1
+matplotlib==3.11.2
+# Phase 3 (torch cu128, transformers, accelerate, sentencepiece, protobuf) is added when training code lands.
