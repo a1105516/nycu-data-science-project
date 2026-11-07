@@ -96,6 +96,18 @@ class EpochSeededLengthSampler(LengthGroupedSampler):
 
 
 class ProjectTrainer(Trainer):
+    def _save(self, output_dir=None, state_dict=None):
+        # Trainer reloads checkpoints with load_state_dict, without HF's legacy key conversion.
+        # Keep runtime names (e.g. LayerNorm.weight/bias), so best-model and resume loads are exact.
+        output_dir = Path(output_dir or self.args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        model = self.accelerator.unwrap_model(self.model, keep_torch_compile=False)
+        model.save_pretrained(output_dir, state_dict=state_dict, save_original_format=False)
+        if self.processing_class is not None:
+            self.processing_class.save_pretrained(output_dir)
+        torch.save(self.args, output_dir / "training_args.bin")
+        # Optimizer, scheduler, RNG and Trainer state are saved by Trainer._save_checkpoint.
+
     def _get_train_sampler(self, train_dataset=None):
         # self.train_dataset still has the `length` column (the dataloader copy has it removed).
         return EpochSeededLengthSampler(self.args.train_batch_size * self.args.gradient_accumulation_steps,
