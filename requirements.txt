@@ -1,20 +1,8 @@
-# Install PyTorch first, separately: the CUDA build depends on the GPU (see docs/run_guide.md).
-#   python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
-
 # Data preparation (Phase 2). Split and sampling results depend on these versions.
 iterative-stratification==0.1.9
 numpy==2.5.4
 pandas==3.0.6
 pyarrow==26.0.0
 scikit-learn==1.9.1
-scipy==1.18.1
 matplotlib==3.11.2
-
-# Modeling (Phase 3)
-transformers==5.22.1
-accelerate==1.15.0
-datasets==5.1.0
-tokenizers==0.23.3
-sentencepiece==0.2.2
-protobuf==7.36.2
-tiktoken==0.14.0
+# Phase 3 (torch cu128, transformers, accelerate, sentencepiece, protobuf) is added when training code lands.
