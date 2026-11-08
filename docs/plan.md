@@ -107,18 +107,15 @@ nycu-data-science-project/
 │   └── civil_comments/
 ├── data/processed/           # prepare_data.py 產出（gitignored）
 ├── outputs/                  # 每個 run 一個資料夾（gitignored）
-│   ├── {model}_{setting}/
-│   └── smoke/{model}_{setting}/
+│   └── {model}_{setting}/
 ├── src/
-│   ├── common.py             # 路徑、LABELS、label mapping、clean()、metric 函式、build_augmented()、fingerprint()
+│   ├── common.py             # 路徑、LABELS、label mapping、clean()、metric 函式
 │   ├── prepare_data.py       # Phase 2
 │   ├── baseline.py           # Phase 3：TF-IDF + LR
 │   ├── train.py              # Phase 3：--model {bert,roberta,deberta} --setting {e0,e1,e2}
 │   ├── evaluate.py           # Phase 4：讀 predictions，產出結果表
 │   └── demo.py               # Phase 6（選做）
-├── docs/
-│   ├── plan.md
-│   └── run_guide.md          # 給在其他電腦跑實驗的隊友
+├── docs/plan.md
 └── requirements.txt
 ```
 
@@ -256,12 +253,7 @@ nycu-data-science-project/
 - **輸出**：和 Transformer 相同格式的 prediction 檔（第 5.4 節），讓 `evaluate.py` 統一處理
 
 ### 5.2 Transformer models
-**程式**：`src/train.py --model {bert,roberta,deberta} --setting {e0,e1,e2} [--smoke] [--batch-size N] [--resume] [--seed N] [--ratio R]`
-
-- `--seed` 和 `--ratio` 是 Refinement 第 3、4 項用的參數，現在先實作，之後不必再改程式（補充）。
-  - `--seed` 只換訓練 seed，資料切分和外部樣本維持 seed 42。
-  - `--ratio` 從 `civil_pool_perm.parquet` 取前 ratio × n 筆，用和 `prepare_data.py` 相同的 `common.build_augmented()` 組成 E1／E2。ratio 1 就是 `train_e1`／`train_e2`。
-  - 輸出資料夾名稱加上後綴，例如 `deberta_e2_r0.5`、`deberta_e0_s43`。
+**程式**：`src/train.py --model {bert,roberta,deberta} --setting {e0,e1,e2} [--smoke]`
 
 | Model | Hugging Face checkpoint |
 |---|---|
@@ -282,14 +274,12 @@ nycu-data-science-project/
 | Epochs | 3 | 簡報 |
 | Effective batch size | 16 | 簡報 |
 | Max sequence length | 256 tokens | 簡報 |
-| Random seed | 42（`transformers.set_seed`）。在載入模型**之前**設定，新 classifier head 的初始化也受 seed 控制 | 簡報 |
+| Random seed | 42（`transformers.set_seed`） | 簡報 |
 | LR schedule | linear decay，warmup 6% | （補充） |
-| 精度 | bf16 autocast；GPU 不支援 bf16 時自動改用 fp16，實際使用的精度記錄在 `config.json` | （補充） |
-| 模型權重 | 一律以 fp32 載入（`dtype=torch.float32`）。transformers v5 預設沿用 checkpoint 的 dtype，而 `deberta-v3-base` 存成 fp16，會導致 fp16 master weights 發散 | （補充） |
-| Per-device batch | 16；OOM 時用 `--batch-size 8`，程式自動設 `gradient_accumulation_steps=2`，effective batch 維持 16 | （補充） |
-| Padding | dynamic padding（`DataCollatorWithPadding`）＋ length grouping（v5 寫法：`train_sampling_strategy="group_by_length"`）。v5 開啟後連 eval／predict 也會打亂順序，所以 eval 改用 sequential sampler，預測依長度排序後再還原原順序。訓練的 length-grouped 順序只由 (seed, epoch) 決定，中途 `--resume` 的那個 epoch 和沒中斷時完全相同（v5 內建 sampler 在中途接續時順序會錯） | （補充） |
-| 推論精度 | 最終的 val／test 預測用 fp32（不經 bf16 autocast），避免 logits 落在 bf16 格點上造成 ROC-AUC 同分；訓練中的 val 評估仍用 bf16 | （補充） |
-| Evaluation 頻率 | 每 0.5 epoch 對 val 評估一次，共 6 個候選 checkpoint；訓練結束時 Trainer 會再評估一次最後一步 | （補充） |
+| 精度 | bf16 | （補充） |
+| Per-device batch | 16；OOM 時改成 8 × `gradient_accumulation_steps=2` | （補充） |
+| Padding | dynamic padding（`DataCollatorWithPadding`）＋ `group_by_length=True` | （補充） |
+| Evaluation 頻率 | 每 0.5 epoch 對 val 評估一次，每個 run 共 6 個候選 checkpoint | （補充） |
 | Checkpoint 保存 | 保留 best 和 last：`save_total_limit=2`、`load_best_model_at_end=True`、`metric_for_best_model="mean_roc_auc"` | （補充） |
 
 - 同一個 run 內，所有 setting 都用相同的超參數，不針對單一 setting 調參。
@@ -297,7 +287,7 @@ nycu-data-science-project/
 - last checkpoint 用於中斷後接續：`--resume` 會轉成 `trainer.train(resume_from_checkpoint=True)`。
 
 ### 5.3 執行順序
-1. **Smoke test**：`--smoke` 只取 1% 的 train、val 和兩個 test（seed 42），跑 1 epoch，輸出到 `outputs/smoke/`。
+1. **Smoke test**：`--smoke` 只取 1% train／val，跑 1 epoch。
    - 確認整個流程能跑完：資料讀取、訓練、評估、存檔、輸出 predictions。
    - 量測 samples/s 和峰值 VRAM。
    - 三個模型各跑一次。
@@ -325,13 +315,7 @@ nycu-data-science-project/
 | `preds_val.parquet` | best checkpoint 對 val 的六類機率 |
 | `preds_test_jigsaw.parquet` | best checkpoint 對 Jigsaw test 的六類機率 |
 | `preds_test_civil.parquet` | best checkpoint 對 Civil test 的機率 |
-| `metrics_val.json` | best checkpoint 在 val 上的指標 |
-| `runtime.json` | 訓練時間、推論時間、samples/s、峰值 VRAM、best checkpoint |
-
-- Prediction 檔的格式：`row` 欄是對應 `data/processed/{split}.parquet` 的列號，後面是六個 label 的機率（float32）。test_civil 也輸出六類，評估時只用五類。
-- `config.json` 記錄訓練資料和每個 eval split 的 data fingerprint（`common.fingerprint()`），以及 Hugging Face 權重的 commit（`checkpoint_revision`）。`evaluate.py` 會和本機的 `data/processed` 比對（訓練資料用 `common.load_train()` 重建後比對），不一致就停止，避免在不同電腦產生的資料上對錯列，或 E1／E2 用到不同批外部樣本。
-- `--resume` 時保留原本的 `config.json`，只在 `resume_sessions` 附加這次的環境紀錄。
-- baseline 也輸出相同格式，放在 `outputs/tfidf_lr_e0/`。
+| `runtime.json` | 訓練時間、推論時間、samples/s、峰值 VRAM |
 
 ### 5.5 GPU 時間粗估
 - 公式：時間 ≈ epochs × 訓練筆數 ÷ samples/s，再加上 val 評估和三個資料集的推論。
@@ -343,13 +327,7 @@ nycu-data-science-project/
 ## 6. Phase 4：Evaluation
 
 **程式**：`src/evaluate.py`。只讀 `outputs/*/preds_*.parquet`，不需要重跑模型。
-**產出**：
-- `outputs/results.md`：第 6.3 節的結果表，以及第 6.4 節的 FP／FN 與翻轉統計
-- `outputs/metrics_long.csv`：每個 run × split 的所有指標（一列一個 run 和 split）
-- `outputs/val_curves.png`：訓練曲線
-- `outputs/error_samples_deberta.csv`：E0 的 threat、identity_hate false negatives 各 20 筆，附 E0／E2 機率，供人工閱讀
-
-Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Bootstrap CI 和 per-label threshold 屬於 Refinement，等 decision gate 後再加。
+**產出**：`outputs/results.md`，以及各結果表的 CSV。
 
 ### 6.1 指標
 
